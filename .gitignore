@@ -1,0 +1,11 @@
+
+ansi.h
+TODO.md
+
+# Dev
+build/
+bin/
+.idea/
+cmake-build-debug/
+
+
