@@ -2,88 +2,12 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <getopt.h>
 #include <math.h>
 
-// I don't really like macros
-#define MAX2(a, b)      (((a) > (b)) ? (a) : (b))
-#define MIN2(a, b)      (((a) > (b)) ? (b) : (a))
-#define MAX3(a, b, c)   MAX2((a), MAX2((b), (c)))
-#define MIN3(a, b, c)   MIN2((a), MIN2((b), (c)))
-#define ROUND(x)        ((x) >= 0 ? floor((x) + 0.5) : ceil((x) - 0.5))
-#define getVarName(var) #var
+#include "color.h"
 
-#define MAXCLOPS        20
-
-enum MODEL_E {
-    RGB = 2,
-    HEX = 4,
-    HSV = 8,
-    HSL = 16,
-};
-
-enum CLOP_E {
-    NEGATE      = 128,
-    CONVERSION  = 256,
-    SATURATE    = 512,
-    ROTATE      = 1024,
-    LIGHTEN     = 4096,
-    BRIGHTEN    = 8192,
-};
-
-typedef struct {
-    int model;
-    float values[4];
-} color_t;
-
-typedef struct {
-    int op;
-    int has_param;
-    float param;
-} clop_t;
-
-
-clop_t createclop(int op, int requires_param, char *value);
-
-color_t creatergb(char *red, char *green, char *blue);
-color_t createhex(char *hex);
-color_t createhsv(char *hue, char *saturation, char *value);
-color_t createhsl(char *hue, char *saturation, char *lightness);
-
-color_t copy(color_t color);
-
-color_t convert(color_t color, int convert_model);
-static color_t rgb2hex(color_t rgb);
-static color_t rgb2hsv(color_t rgb);
-static color_t rgb2hsl(color_t rgb);
-static color_t hex2rgb(color_t hex);
-static color_t hex2hsv(color_t hex);
-static color_t hex2hsl(color_t hex);
-static color_t hsv2rgb(color_t hsv);
-static color_t hsv2hex(color_t hsv);
-static color_t hsv2hsl(color_t hsv);
-static color_t hsl2rgb(color_t hsl);
-static color_t hsl2hex(color_t hsl);
-static color_t hsl2hsv(color_t hsl);
-
-color_t negate(color_t color);
-static color_t negatergb(color_t rgb);
-static color_t negatehex(color_t hex);
-static color_t negatehsv(color_t hsv);
-static color_t negatehsl(color_t hsl);
-
-color_t saturate(color_t color, float value);
-color_t rotate(color_t color, float value);
-color_t lighten(color_t color, float value);
-color_t brighten(color_t color, float value);
-
-void displaycolor(color_t color);
-static void displayrgb(color_t rgb);
-static void displayhex(color_t hex);
-static void displayhsv(color_t hsv);
-static void displayhsl(color_t hsv);
-
-void usage(void);
 
 static struct option arg_options[] = {
   { "negate",     no_argument,        0,  'n' },
@@ -95,11 +19,12 @@ static struct option arg_options[] = {
   { 0, 0, 0, 0 }
 };
 
-/* TODO: impl cmyk color model */
+
 int main(int argc, char **argv)
 {
   clop_t CLOPS[MAXCLOPS];
   int COLOR_MODEL = RGB, clp = 0;
+  color_t color;
   char *var1, *var2, *var3;
 
   char **argv_ptr = argv;
@@ -122,35 +47,38 @@ int main(int argc, char **argv)
     strcmp(*argv, "hsv") == 0 ? HSV :
     strcmp(*argv, "hsl") == 0 ? HSL : 0;
 
-  if (COLOR_MODEL == 0) {
-    fprintf(stderr, "color: you must specifiy color model.\n");
-    fprintf(stderr, "Try 'color --help' for available color models.\n");
-    exit(1);
-  }
-
   /* parse color values */
-  if (strcmp(*argv, "hex") == 0) {
+  if (COLOR_MODEL == HEX) {
     if (*(++argv) == NULL) {
       fprintf(stderr, "color: invalid %s color format.\n", *(--argv));
       fprintf(stderr, "Try 'color --help' for more options.\n");
       exit(-1);
     } else {
-      COLOR_MODEL = HEX;
-      var1 = *argv;
+      color = createhex(*argv);
     }
-  } else {
-    COLOR_MODEL = strcmp(*argv, "rgb") == 0 ? RGB :
-                         strcmp(*argv, "hsl") == 0 ? HSL :
-                         strcmp(*argv, "hsv") == 0 ? HSV : 0;
-    if (COLOR_MODEL != 0 && argc > 4) {
+  } else if ((COLOR_MODEL == HEX || COLOR_MODEL == RGB ||
+      COLOR_MODEL == HSV || COLOR_MODEL == HSL)) {
+    if (argc > 4) {
       var1 = *(++argv);
       var2 = *(++argv);
       var3 = *(++argv);
     } else {
-      fprintf(stderr, "color: nvalid %s color format.\n", *argv);
+      fprintf(stderr, "color: invalid %s color format.\n", *argv);
       fprintf(stderr, "Try 'color --help' for more options.\n");
       exit(-1);
     }
+    /* create color */
+    switch (COLOR_MODEL) {
+    case RGB: color = creatergb(var1, var2, var3); break;
+    case HSV: color = createhsv(var1, var2, var3); break;
+    case HSL: color = createhsl(var1, var2, var3); break;
+    }
+  } else if (COLOR_MODEL == 0 && createpredefinedcolor(*argv, &color)) {
+    // ignored line
+  } else {
+    fprintf(stderr, "color: you must specifiy color model.\n");
+    fprintf(stderr, "Try 'color --help' for available color models.\n");
+    exit(1);
   }
 
   /* parse options */
@@ -166,16 +94,6 @@ int main(int argc, char **argv)
     case '?': exit(-1);
     default: break;
     }
-  }
-
-  color_t color;
-
-  /* create color */
-  switch (COLOR_MODEL) {
-  case RGB: color = creatergb(var1, var2, var3); break;
-  case HEX: color = createhex(var1); break;
-  case HSV: color = createhsv(var1, var2, var3); break;
-  case HSL: color = createhsl(var1, var2, var3); break;
   }
 
   /* apply clops */
@@ -196,11 +114,7 @@ int main(int argc, char **argv)
   return 0;
 }
 
-#define EXIT_ON_FAILURE(args...) { \
-      printf("color: "); \
-      printf(args); \
-      exit(1); \
-    }
+
 
 clop_t createclop(int op, int has_param, char *value)
 {
@@ -307,6 +221,170 @@ color_t createhsl(char *hue, char *saturation, char *lightness)
   hsl_color.values[2] = l;
   hsl_color.values[3] = 255;
   return hsl_color;
+}
+
+int createpredefinedcolor(const char *arg, color_t *color)
+{
+  if (!strcasecmp(arg, "white")) { *color = ANSI_WHITE; return 1; }
+  else if (!strcasecmp(arg, "black")) { *color = ANSI_BLACK; return 1; }
+  if (!strcasecmp(arg, "aliceblue")) { *color = ANSI_ALICEBLUE; return 1; }
+  else if (!strcasecmp(arg, "antiquewhite")) { *color = ANSI_ANTIQUEWHITE; return 1; }
+  else if (!strcasecmp(arg, "aqua")) { *color = ANSI_AQUA; return 1; }
+  else if (!strcasecmp(arg, "aquamarine")) { *color = ANSI_AQUAMARINE; return 1; }
+  else if (!strcasecmp(arg, "azure")) { *color = ANSI_AZURE; return 1; }
+  else if (!strcasecmp(arg, "beige")) { *color = ANSI_BEIGE; return 1; }
+  else if (!strcasecmp(arg, "bisque")) { *color = ANSI_BISQUE; return 1; }
+  else if (!strcasecmp(arg, "black")) { *color = ANSI_BLACK; return 1; }
+  else if (!strcasecmp(arg, "blanchedalmond")) { *color = ANSI_BLANCHEDALMOND; return 1; }
+  else if (!strcasecmp(arg, "blue")) { *color = ANSI_BLUE; return 1; }
+  else if (!strcasecmp(arg, "blueviolet")) { *color = ANSI_BLUEVIOLET; return 1; }
+  else if (!strcasecmp(arg, "brown")) { *color = ANSI_BROWN; return 1; }
+  else if (!strcasecmp(arg, "burlywood")) { *color = ANSI_BURLYWOOD; return 1; }
+  else if (!strcasecmp(arg, "cadetblue")) { *color = ANSI_CADETBLUE; return 1; }
+  else if (!strcasecmp(arg, "chartreuse")) { *color = ANSI_CHARTREUSE; return 1; }
+  else if (!strcasecmp(arg, "chocolate")) { *color = ANSI_CHOCOLATE; return 1; }
+  else if (!strcasecmp(arg, "coral")) { *color = ANSI_CORAL; return 1; }
+  else if (!strcasecmp(arg, "cornflowerblue")) { *color = ANSI_CORNFLOWERBLUE; return 1; }
+  else if (!strcasecmp(arg, "cornsilk")) { *color = ANSI_CORNSILK; return 1; }
+  else if (!strcasecmp(arg, "crimson")) { *color = ANSI_CRIMSON; return 1; }
+  else if (!strcasecmp(arg, "cyan")) { *color = ANSI_CYAN; return 1; }
+  else if (!strcasecmp(arg, "darkblue")) { *color = ANSI_DARKBLUE; return 1; }
+  else if (!strcasecmp(arg, "darkcyan")) { *color = ANSI_DARKCYAN; return 1; }
+  else if (!strcasecmp(arg, "darkgoldenrod")) { *color = ANSI_DARKGOLDENROD; return 1; }
+  else if (!strcasecmp(arg, "darkgray")) { *color = ANSI_DARKGRAY; return 1; }
+  else if (!strcasecmp(arg, "darkgreen")) { *color = ANSI_DARKGREEN; return 1; }
+  else if (!strcasecmp(arg, "darkgrey")) { *color = ANSI_DARKGREY; return 1; }
+  else if (!strcasecmp(arg, "darkkhaki")) { *color = ANSI_DARKKHAKI; return 1; }
+  else if (!strcasecmp(arg, "darkmagenta")) { *color = ANSI_DARKMAGENTA; return 1; }
+  else if (!strcasecmp(arg, "darkolivegreen")) { *color = ANSI_DARKOLIVEGREEN; return 1; }
+  else if (!strcasecmp(arg, "darkorange")) { *color = ANSI_DARKORANGE; return 1; }
+  else if (!strcasecmp(arg, "darkorchid")) { *color = ANSI_DARKORCHID; return 1; }
+  else if (!strcasecmp(arg, "darkred")) { *color = ANSI_DARKRED; return 1; }
+  else if (!strcasecmp(arg, "darksalmon")) { *color = ANSI_DARKSALMON; return 1; }
+  else if (!strcasecmp(arg, "darkseagreen")) { *color = ANSI_DARKSEAGREEN; return 1; }
+  else if (!strcasecmp(arg, "darkslateblue")) { *color = ANSI_DARKSLATEBLUE; return 1; }
+  else if (!strcasecmp(arg, "darkslategray")) { *color = ANSI_DARKSLATEGRAY; return 1; }
+  else if (!strcasecmp(arg, "darkslategrey")) { *color = ANSI_DARKSLATEGREY; return 1; }
+  else if (!strcasecmp(arg, "darkturquoise")) { *color = ANSI_DARKTURQUOISE; return 1; }
+  else if (!strcasecmp(arg, "darkviolet")) { *color = ANSI_DARKVIOLET; return 1; }
+  else if (!strcasecmp(arg, "deeppink")) { *color = ANSI_DEEPPINK; return 1; }
+  else if (!strcasecmp(arg, "deepskyblue")) { *color = ANSI_DEEPSKYBLUE; return 1; }
+  else if (!strcasecmp(arg, "dimgray")) { *color = ANSI_DIMGRAY; return 1; }
+  else if (!strcasecmp(arg, "dimgrey")) { *color = ANSI_DIMGREY; return 1; }
+  else if (!strcasecmp(arg, "dodgerblue")) { *color = ANSI_DODGERBLUE; return 1; }
+  else if (!strcasecmp(arg, "firebrick")) { *color = ANSI_FIREBRICK; return 1; }
+  else if (!strcasecmp(arg, "floralwhite")) { *color = ANSI_FLORALWHITE; return 1; }
+  else if (!strcasecmp(arg, "forestgreen")) { *color = ANSI_FORESTGREEN; return 1; }
+  else if (!strcasecmp(arg, "fuchsia")) { *color = ANSI_FUCHSIA; return 1; }
+  else if (!strcasecmp(arg, "gainsboro")) { *color = ANSI_GAINSBORO; return 1; }
+  else if (!strcasecmp(arg, "ghostwhite")) { *color = ANSI_GHOSTWHITE; return 1; }
+  else if (!strcasecmp(arg, "gold")) { *color = ANSI_GOLD; return 1; }
+  else if (!strcasecmp(arg, "goldenrod")) { *color = ANSI_GOLDENROD; return 1; }
+  else if (!strcasecmp(arg, "gray")) { *color = ANSI_GRAY; return 1; }
+  else if (!strcasecmp(arg, "green")) { *color = ANSI_GREEN; return 1; }
+  else if (!strcasecmp(arg, "greenyellow")) { *color = ANSI_GREENYELLOW; return 1; }
+  else if (!strcasecmp(arg, "grey")) { *color = ANSI_GREY; return 1; }
+  else if (!strcasecmp(arg, "honeydew")) { *color = ANSI_HONEYDEW; return 1; }
+  else if (!strcasecmp(arg, "hotpink")) { *color = ANSI_HOTPINK; return 1; }
+  else if (!strcasecmp(arg, "indianred")) { *color = ANSI_INDIANRED; return 1; }
+  else if (!strcasecmp(arg, "indigo")) { *color = ANSI_INDIGO; return 1; }
+  else if (!strcasecmp(arg, "ivory")) { *color = ANSI_IVORY; return 1; }
+  else if (!strcasecmp(arg, "khaki")) { *color = ANSI_KHAKI; return 1; }
+  else if (!strcasecmp(arg, "lavender")) { *color = ANSI_LAVENDER; return 1; }
+  else if (!strcasecmp(arg, "lavenderblush")) { *color = ANSI_LAVENDERBLUSH; return 1; }
+  else if (!strcasecmp(arg, "lawngreen")) { *color = ANSI_LAWNGREEN; return 1; }
+  else if (!strcasecmp(arg, "lemonchiffon")) { *color = ANSI_LEMONCHIFFON; return 1; }
+  else if (!strcasecmp(arg, "lightblue")) { *color = ANSI_LIGHTBLUE; return 1; }
+  else if (!strcasecmp(arg, "lightcoral")) { *color = ANSI_LIGHTCORAL; return 1; }
+  else if (!strcasecmp(arg, "lightcyan")) { *color = ANSI_LIGHTCYAN; return 1; }
+  else if (!strcasecmp(arg, "lightgoldenrodyellow")) { *color = ANSI_LIGHTGOLDENRODYELLOW; return 1; }
+  else if (!strcasecmp(arg, "lightgray")) { *color = ANSI_LIGHTGRAY; return 1; }
+  else if (!strcasecmp(arg, "lightgreen")) { *color = ANSI_LIGHTGREEN; return 1; }
+  else if (!strcasecmp(arg, "lightgrey")) { *color = ANSI_LIGHTGREY; return 1; }
+  else if (!strcasecmp(arg, "lightpink")) { *color = ANSI_LIGHTPINK; return 1; }
+  else if (!strcasecmp(arg, "lightsalmon")) { *color = ANSI_LIGHTSALMON; return 1; }
+  else if (!strcasecmp(arg, "lightseagreen")) { *color = ANSI_LIGHTSEAGREEN; return 1; }
+  else if (!strcasecmp(arg, "lightskyblue")) { *color = ANSI_LIGHTSKYBLUE; return 1; }
+  else if (!strcasecmp(arg, "lightslategray")) { *color = ANSI_LIGHTSLATEGRAY; return 1; }
+  else if (!strcasecmp(arg, "lightslategrey")) { *color = ANSI_LIGHTSLATEGREY; return 1; }
+  else if (!strcasecmp(arg, "lightsteelblue")) { *color = ANSI_LIGHTSTEELBLUE; return 1; }
+  else if (!strcasecmp(arg, "lightyellow")) { *color = ANSI_LIGHTYELLOW; return 1; }
+  else if (!strcasecmp(arg, "lime")) { *color = ANSI_LIME; return 1; }
+  else if (!strcasecmp(arg, "limegreen")) { *color = ANSI_LIMEGREEN; return 1; }
+  else if (!strcasecmp(arg, "linen")) { *color = ANSI_LINEN; return 1; }
+  else if (!strcasecmp(arg, "magenta")) { *color = ANSI_MAGENTA; return 1; }
+  else if (!strcasecmp(arg, "maroon")) { *color = ANSI_MAROON; return 1; }
+  else if (!strcasecmp(arg, "mediumaquamarine")) { *color = ANSI_MEDIUMAQUAMARINE; return 1; }
+  else if (!strcasecmp(arg, "mediumblue")) { *color = ANSI_MEDIUMBLUE; return 1; }
+  else if (!strcasecmp(arg, "mediumorchid")) { *color = ANSI_MEDIUMORCHID; return 1; }
+  else if (!strcasecmp(arg, "mediumpurple")) { *color = ANSI_MEDIUMPURPLE; return 1; }
+  else if (!strcasecmp(arg, "mediumseagreen")) { *color = ANSI_MEDIUMSEAGREEN; return 1; }
+  else if (!strcasecmp(arg, "mediumslateblue")) { *color = ANSI_MEDIUMSLATEBLUE; return 1; }
+  else if (!strcasecmp(arg, "mediumspringgreen")) { *color = ANSI_MEDIUMSPRINGGREEN; return 1; }
+  else if (!strcasecmp(arg, "mediumturquoise")) { *color = ANSI_MEDIUMTURQUOISE; return 1; }
+  else if (!strcasecmp(arg, "mediumvioletred")) { *color = ANSI_MEDIUMVIOLETRED; return 1; }
+  else if (!strcasecmp(arg, "midnightblue")) { *color = ANSI_MIDNIGHTBLUE; return 1; }
+  else if (!strcasecmp(arg, "mintcream")) { *color = ANSI_MINTCREAM; return 1; }
+  else if (!strcasecmp(arg, "mistyrose")) { *color = ANSI_MISTYROSE; return 1; }
+  else if (!strcasecmp(arg, "moccasin")) { *color = ANSI_MOCCASIN; return 1; }
+  else if (!strcasecmp(arg, "navajowhite")) { *color = ANSI_NAVAJOWHITE; return 1; }
+  else if (!strcasecmp(arg, "navy")) { *color = ANSI_NAVY; return 1; }
+  else if (!strcasecmp(arg, "oldlace")) { *color = ANSI_OLDLACE; return 1; }
+  else if (!strcasecmp(arg, "olive")) { *color = ANSI_OLIVE; return 1; }
+  else if (!strcasecmp(arg, "olivedrab")) { *color = ANSI_OLIVEDRAB; return 1; }
+  else if (!strcasecmp(arg, "orange")) { *color = ANSI_ORANGE; return 1; }
+  else if (!strcasecmp(arg, "orangered")) { *color = ANSI_ORANGERED; return 1; }
+  else if (!strcasecmp(arg, "orchid")) { *color = ANSI_ORCHID; return 1; }
+  else if (!strcasecmp(arg, "palegoldenrod")) { *color = ANSI_PALEGOLDENROD; return 1; }
+  else if (!strcasecmp(arg, "palegreen")) { *color = ANSI_PALEGREEN; return 1; }
+  else if (!strcasecmp(arg, "paleturquoise")) { *color = ANSI_PALETURQUOISE; return 1; }
+  else if (!strcasecmp(arg, "palevioletred")) { *color = ANSI_PALEVIOLETRED; return 1; }
+  else if (!strcasecmp(arg, "papayawhip")) { *color = ANSI_PAPAYAWHIP; return 1; }
+  else if (!strcasecmp(arg, "peachpuff")) { *color = ANSI_PEACHPUFF; return 1; }
+  else if (!strcasecmp(arg, "peru")) { *color = ANSI_PERU; return 1; }
+  else if (!strcasecmp(arg, "pink")) { *color = ANSI_PINK; return 1; }
+  else if (!strcasecmp(arg, "plum")) { *color = ANSI_PLUM; return 1; }
+  else if (!strcasecmp(arg, "powderblue")) { *color = ANSI_POWDERBLUE; return 1; }
+  else if (!strcasecmp(arg, "purple")) { *color = ANSI_PURPLE; return 1; }
+  else if (!strcasecmp(arg, "red")) { *color = ANSI_RED; return 1; }
+  else if (!strcasecmp(arg, "rosybrown")) { *color = ANSI_ROSYBROWN; return 1; }
+  else if (!strcasecmp(arg, "royalblue")) { *color = ANSI_ROYALBLUE; return 1; }
+  else if (!strcasecmp(arg, "saddlebrown")) { *color = ANSI_SADDLEBROWN; return 1; }
+  else if (!strcasecmp(arg, "salmon")) { *color = ANSI_SALMON; return 1; }
+  else if (!strcasecmp(arg, "sandybrown")) { *color = ANSI_SANDYBROWN; return 1; }
+  else if (!strcasecmp(arg, "seagreen")) { *color = ANSI_SEAGREEN; return 1; }
+  else if (!strcasecmp(arg, "seashell")) { *color = ANSI_SEASHELL; return 1; }
+  else if (!strcasecmp(arg, "sienna")) { *color = ANSI_SIENNA; return 1; }
+  else if (!strcasecmp(arg, "silver")) { *color = ANSI_SILVER; return 1; }
+  else if (!strcasecmp(arg, "skyblue")) { *color = ANSI_SKYBLUE; return 1; }
+  else if (!strcasecmp(arg, "slateblue")) { *color = ANSI_SLATEBLUE; return 1; }
+  else if (!strcasecmp(arg, "slategray")) { *color = ANSI_SLATEGRAY; return 1; }
+  else if (!strcasecmp(arg, "slategrey")) { *color = ANSI_SLATEGREY; return 1; }
+  else if (!strcasecmp(arg, "snow")) { *color = ANSI_SNOW; return 1; }
+  else if (!strcasecmp(arg, "springgreen")) { *color = ANSI_SPRINGGREEN; return 1; }
+  else if (!strcasecmp(arg, "steelblue")) { *color = ANSI_STEELBLUE; return 1; }
+  else if (!strcasecmp(arg, "tan")) { *color = ANSI_TAN; return 1; }
+  else if (!strcasecmp(arg, "teal")) { *color = ANSI_TEAL; return 1; }
+  else if (!strcasecmp(arg, "thistle")) { *color = ANSI_THISTLE; return 1; }
+  else if (!strcasecmp(arg, "tomato")) { *color = ANSI_TOMATO; return 1; }
+  else if (!strcasecmp(arg, "turquoise")) { *color = ANSI_TURQUOISE; return 1; }
+  else if (!strcasecmp(arg, "violet")) { *color = ANSI_VIOLET; return 1; }
+  else if (!strcasecmp(arg, "wheat")) { *color = ANSI_WHEAT; return 1; }
+  else if (!strcasecmp(arg, "white")) { *color = ANSI_WHITE; return 1; }
+  else if (!strcasecmp(arg, "whitesmoke")) { *color = ANSI_WHITESMOKE; return 1; }
+  else if (!strcasecmp(arg, "yellow")) { *color = ANSI_YELLOW; return 1; }
+  else if (!strcasecmp(arg, "yellowgreen")) { *color = ANSI_YELLOWGREEN; return 1; }
+  else if (!strcasecmp(arg, "purple")) { *color = ANSI_PURPLE; return 1; }
+  else if (!strcasecmp(arg, "fuchsia")) { *color = ANSI_FUCHSIA; return 1; }
+  else if (!strcasecmp(arg, "green")) { *color = ANSI_GREEN; return 1; }
+  else if (!strcasecmp(arg, "lime")) { *color = ANSI_LIME; return 1; }
+  else if (!strcasecmp(arg, "olive")) { *color = ANSI_OLIVE; return 1; }
+  else if (!strcasecmp(arg, "yellow")) { *color = ANSI_YELLOW; return 1; }
+  else if (!strcasecmp(arg, "navy")) { *color = ANSI_NAVY; return 1; }
+  else if (!strcasecmp(arg, "blue")) { *color = ANSI_BLUE; return 1; }
+  else if (!strcasecmp(arg, "teal")) { *color = ANSI_TEAL; return 1; }
+  else if (!strcasecmp(arg, "aqua")) { *color = ANSI_AQUA; return 1; }
+  return 0;
 }
 
 color_t copy(color_t color) {
@@ -564,7 +642,7 @@ color_t rotate(color_t color, float value)
   int color_model = color.model;
   color = convert(color, HSL);
   float new_hue = (new_hue = color.values[0] + value) < 0 ?
-                  ((int)(-new_hue) / 360 + 1) * 360 + new_hue : new_hue;
+                  (float)(((float)(int)(-new_hue) / 360 + 1) * 360 + new_hue) : new_hue;
   color.values[0] = fmodf(new_hue, 360);
   color = convert(color, color_model);
   return color;
@@ -602,12 +680,7 @@ void displaycolor(color_t color)
   }
 }
 
-#define RGB_PREFIX(rgb) \
-    int r = (int) round(rgb.values[0]), g = (int) round(rgb.values[1]), b = (int) round(rgb.values[2]); \
-    printf("\033[38;2;%d;%d;%dm", 255 - r, 255 - g, 255 - b); \
-    printf("\033[48;2;%d;%d;%dm", r, g, b) /* bg */
 
-#define RGB_SUFFIX printf("\033[0m\n")
 
 static void displayrgb(color_t rgb)
 {
