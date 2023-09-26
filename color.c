@@ -58,8 +58,7 @@ int main(int argc, char **argv)
     } else {
       color = createhex(*argv);
     }
-  } else if ((COLOR_MODEL == HEX || COLOR_MODEL == RGB ||
-      COLOR_MODEL == HSV || COLOR_MODEL == HSL)) {
+  } else if ((COLOR_MODEL == RGB || COLOR_MODEL == HSV || COLOR_MODEL == HSL)) {
     if (argc > 4) {
       var1 = *(++argv);
       var2 = *(++argv);
@@ -81,7 +80,7 @@ int main(int argc, char **argv)
     color = createrandom();
   } else {
     fprintf(stderr, "color: invalid command %s.\n", *argv);
-    fprintf(stderr, "Try 'color --help' for available color models.\n");
+    fprintf(stderr, "Try 'color --help' for more options.\n");
     exit(1);
   }
 
@@ -240,7 +239,7 @@ color_t createhsl(char *hue, char *saturation, char *lightness)
 color_t copy(color_t color) {
   color_t copy;
   copy.model = color.model;
-  for (int i = 0; i < 4; i++)
+  for (int i = 0; i < (sizeof(color.values) / sizeof(color.values[0])); i++)
     copy.values[i] = color.values[i];
   return copy;
 }
@@ -492,7 +491,7 @@ color_t rotate(color_t color, float value)
   int color_model = color.model;
   color = convert(color, HSL);
   float new_hue = (new_hue = color.values[0] + value) < 0 ?
-                  (float)(((float)(int)(-new_hue) / 360 + 1) * 360 + new_hue) : new_hue;
+    (float)(((float)(int)(-new_hue) / 360 + 1) * 360 + new_hue) : new_hue;
   color.values[0] = fmodf(new_hue, 360);
   color = convert(color, color_model);
   return color;
@@ -522,43 +521,36 @@ color_t brighten(color_t color, float value)
 
 void displaycolor(color_t color)
 {
+  printf("%s\n", getcolorstr(color));
+}
+
+char *getcolorstr(color_t color) {
+  // alloc mem for ret string
+  char *colorstr = (char *)malloc(sizeof(char) * 70);
+  // fill foreground and background color
+  color_t rgbrepr = color.model == RGB ? color : convert(color, RGB);
+  int r = (int) round(rgbrepr.values[0]), g = (int) round(rgbrepr.values[1]), b = (int) round(rgbrepr.values[2]);
+  int length = 0;
+  length += sprintf(colorstr, "\033[38;2;%d;%d;%dm", 255 - r, 255 - g, 255 - b);
+  length += sprintf(colorstr + length, "\033[48;2;%d;%d;%dm", r, g, b);
+  // concatenate color model values
   switch (color.model) {
-  case RGB: displayrgb(color); break;
-  case HEX: displayhex(color); break;
-  case HSV: displayhsv(color); break;
-  case HSL: displayhsl(color); break;
+    case RGB:
+      length += sprintf(colorstr + length, "rgb(%.0f, %.0f, %.0f)", color.values[0], color.values[1], color.values[2]);
+      break;
+    case HEX:
+      length += sprintf(colorstr + length, "#%06X", (int)round(color.values[0]));
+      break;
+    case HSV:
+      length += sprintf(colorstr + length, "hsv(%.2f, %.2f%%, %.2f%%)", color.values[0], color.values[1], color.values[2]);
+      break;
+    case HSL:
+      length += sprintf(colorstr + length, "hsl(%.2f, %.2f%%, %.2f%%)", color.values[0], color.values[1], color.values[2]);
+      break;
   }
-}
-
-static void displayrgb(color_t rgb)
-{
-  RGB_PREFIX(rgb);
-  printf("rgb(%d, %d, %d)", r, g, b);
-  RGB_SUFFIX;
-}
-
-static void displayhex(color_t hex)
-{
-  color_t rgb = hex2rgb(hex);
-  RGB_PREFIX(rgb);
-  printf("#%06X", (int)round(hex.values[0]));
-  RGB_SUFFIX;
-}
-
-static void displayhsv(color_t hsv)
-{
-  color_t rgb = hsv2rgb(hsv);
-  RGB_PREFIX(rgb);
-  printf("hsv(%.2f, %.2f%%, %.2f%%)", hsv.values[0], hsv.values[1], hsv.values[2]);
-  RGB_SUFFIX;
-}
-
-static void displayhsl(color_t hsl)
-{
-  color_t rgb = hsl2rgb(hsl);
-  RGB_PREFIX(rgb);
-  printf("hsl(%.2f, %.2f%%, %.2f%%)", hsl.values[0], hsl.values[1], hsl.values[2]);
-  RGB_SUFFIX;
+  // reset color
+  sprintf(colorstr + length, "\033[0m");
+  return colorstr;
 }
 
 void usage(void)
@@ -572,8 +564,8 @@ void usage(void)
   puts("    color lightcyan --to hsv\n");
   puts("Models:");
   puts("    rgb             RGB values are between 0-255.");
-  puts("    hex             HEX can be 3-bit or 6-bit integer. valid: 0x, 0X, #.");
-  puts("    hsv             Hue is 0-359deg, S, V - 0-100%.");
+  puts("    hex             HEX is a 6-bit integer. valid prefixes: 0x, 0X, #.");
+  puts("    hsv             Hue is 0-359deg, S, V are between 0-100%.");
   puts("    hsl             Same specifications as HSV color model.\n");
   puts("Predefined Colors:");
   puts("    Are all CSS colors such as: antiquewhite, darkgray... . They are NOT");

@@ -83,10 +83,7 @@ color_t lighten(color_t color, float value);
 color_t brighten(color_t color, float value);
 
 void displaycolor(color_t color);
-static void displayrgb(color_t rgb);
-static void displayhex(color_t hex);
-static void displayhsv(color_t hsv);
-static void displayhsl(color_t hsv);
+char *getcolorstr(color_t color);
 
 void usage(void);
 
@@ -248,3 +245,5 @@ void usage(void);
 
 
 #endif //COLOR_COLOR_H
+
+
