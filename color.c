@@ -214,6 +214,7 @@ typedef struct {
 
 clop_t createclop(int op, int requires_param, char *value);
 
+color_t createcolor(int color_model, int value1, int value2, int value3, int value4);
 color_t createrandom(void);
 color_t creatergb(char *red, char *green, char *blue);
 color_t createhex(char *hex);
@@ -388,13 +389,20 @@ clop_t createclop(int op, int has_param, char *value)
   return clop;
 }
 
-color_t createrandom(void)
+color_t createcolor(int color_model, int value1, int value2, int value3, int value4)
 {
   color_t color;
-  color.model = HSL;
-  color.values[0] = rand() % 360;
-  color.values[1] = rand() % 100;
-  color.values[2] = rand() % 100;
+  color.model = color_model;
+  color.values[0] = value1;
+  color.values[1] = value2;
+  color.values[2] = value3;
+  color.values[3] = value4;
+  return color;
+}
+
+color_t createrandom(void)
+{
+  color_t color = createcolor(HSL, rand() % 360, rand() % 101, rand() % 101, 255);
   color = hsl2rgb(color);
   return color;
 }
@@ -409,12 +417,7 @@ color_t creatergb(char *red, char *green, char *blue)
   if (!(0 <= r && r < 256)) EXIT_ON_FAILURE("invalid red value: %s\n", red)
   if (!(0 <= g && g < 256)) EXIT_ON_FAILURE("invalid green value: %s\n", green)
   if (!(0 <= b && b < 256)) EXIT_ON_FAILURE("invalid blue value: %s\n", blue)
-  color_t rgb_color;
-  rgb_color.model = RGB;
-  rgb_color.values[0] = r;
-  rgb_color.values[1] = g;
-  rgb_color.values[2] = b;
-  rgb_color.values[3] = 255;
+  color_t rgb_color = createcolor(RGB, r, g, b, 255);
   return rgb_color;
 }
 
@@ -439,9 +442,7 @@ color_t createhex(char *hex)
     EXIT_ON_FAILURE("invalid hex format: %s\n", hex)
   int r, g, b;
   sscanf(hexvalue, "%02x%02x%02x", &r, &g, &b);
-  color_t hex_color;
-  hex_color.model = HEX;
-  hex_color.values[0] = ((r & 0xFF) << 16) + ((g & 0xFF) << 8) + ((b & 0xFF));
+  color_t hex_color = createcolor(HEX, ((r & 0xFF) << 16) + ((g & 0xFF) << 8) + ((b & 0xFF)), 0, 0, 255);
   return hex_color;
 }
 
@@ -454,12 +455,7 @@ color_t createhsv(char *hue, char *saturation, char *value)
   if (h < 0) EXIT_ON_FAILURE("invalid hue value: %s\n", hue)
   if (!(0 <= s && s <= 100)) EXIT_ON_FAILURE("invalid saturation value: %s\n", saturation)
   if (!(0 <= v && v <= 100)) EXIT_ON_FAILURE("invalid brightness value: %s\n", value)
-  color_t hsv_color;
-  hsv_color.model = HSV;
-  hsv_color.values[0] = fmodf(h, 360.f);
-  hsv_color.values[1] = s;
-  hsv_color.values[2] = v;
-  hsv_color.values[3] = 255;
+  color_t hsv_color = createcolor(HSV, fmodf(h, 360.f), s, v, 255);
   return hsv_color;
 }
 
@@ -472,12 +468,7 @@ color_t createhsl(char *hue, char *saturation, char *lightness)
   if (h < 0) EXIT_ON_FAILURE("invalid hue value: %s\n", hue)
   if (!(0 <= s && s <= 100)) EXIT_ON_FAILURE("invalid saturation value: %s\n", saturation)
   if (!(0 <= l && l <= 100)) EXIT_ON_FAILURE("invalid lightness value: %s\n", lightness)
-  color_t hsl_color;
-  hsl_color.model = HSL;
-  hsl_color.values[0] = fmodf(h, 360.f);
-  hsl_color.values[1] = s;
-  hsl_color.values[2] = l;
-  hsl_color.values[3] = 255;
+  color_t hsl_color = createcolor(HSL, fmodf(h, 360.f), s, l, 255);
   return hsl_color;
 }
 
@@ -552,11 +543,7 @@ static color_t rgb2hsv(color_t rgb)
       hue + 360 : hue, 360.f);
   float value = max;
   float saturation = max == 0 ? 0 : (max - min) / max;
-  color_t hsv_color;
-  hsv_color.model = HSV;
-  hsv_color.values[0] = hue;
-  hsv_color.values[1] = saturation * 100.f;
-  hsv_color.values[2] = value * 100.f;
+  color_t hsv_color = createcolor(HSV, hue, saturation * 100.f, value * 100.f, 255);
   return hsv_color;
 }
 
@@ -573,21 +560,13 @@ static color_t rgb2hsl(color_t rgb)
   float luminosity = (max + min) / 2;
   float saturation = (max == min) ? 0 :
     ((max - min) / (1 - fabsf(2 * luminosity - 1)));
-  color_t hsl_color;
-  hsl_color.model = HSL;
-  hsl_color.values[0] = hue;
-  hsl_color.values[1] = saturation * 100.f;
-  hsl_color.values[2] = luminosity * 100.f;
+  color_t hsl_color = createcolor(HSL, hue, saturation * 100.f, luminosity * 100.f, 255);
   return hsl_color;
 }
 
 static color_t hex2rgb(color_t hex)
 {
-  color_t rgb_color;
-  rgb_color.model = RGB;
-  rgb_color.values[2] = (int)roundf(hex.values[0]) & 0xFF;
-  rgb_color.values[1] = ((int)roundf(hex.values[0]) >> 8) & 0xFF;
-  rgb_color.values[0] = ((int)roundf(hex.values[0]) >> 16) & 0xFF;
+  color_t rgb_color = createcolor(RGB, (int)roundf(hex.values[0]) & 0xFF, ((int)roundf(hex.values[0]) >> 8) & 0xFF, ((int)roundf(hex.values[0]) >> 16) & 0xFF, 255);
   return rgb_color;
 }
 
@@ -612,11 +591,7 @@ static color_t hsv2rgb(color_t hsv)
   else if (180 <= h && h < 240) r = 0, g = x, b = c;
   else if (240 <= h && h < 300) r = x, g = 0, b = c;
   else if (300 <= h && h < 360) r = c, g = 0, b = x;
-  color_t rgb_color;
-  rgb_color.model = RGB;
-  rgb_color.values[0] = (r + m) * 255.f;
-  rgb_color.values[1] = (g + m) * 255.f;
-  rgb_color.values[2] = (b + m) * 255.f;
+  color_t rgb_color = createcolor(RGB, (r + m) * 255.f, (g + m) * 255.f, (b + m) * 255.f, 255);
   return rgb_color;
 }
 
@@ -632,11 +607,7 @@ static color_t hsv2hsl(color_t hsv)
   float v_hsv = hsv.values[2] / 100.f;
   float l = v_hsv - v_hsv * s_hsv / 2;
   float s = l == 0 || l == 1 ? 0 : (v_hsv - l) / MIN2(l, 1 - l);
-  color_t hsl_color;
-  hsl_color.model = HSL;
-  hsl_color.values[0] = h;
-  hsl_color.values[1] = s * 100.f;
-  hsl_color.values[2] = l * 100.f;
+  color_t hsl_color = createcolor(HSL, h, s * 100.f, l * 100.f, 255);
   return hsl_color;
 }
 
@@ -653,11 +624,7 @@ static color_t hsl2rgb(color_t hsl)
   else if (180 <= h && h < 240) r = 0, g = x, b = c;
   else if (240 <= h && h < 300) r = x, g = 0, b = c;
   else if (300 <= h && h < 360) r = c, g = 0, b = x;
-  color_t rgb_color;
-  rgb_color.model = RGB;
-  rgb_color.values[0] = (r + m) * 255.f;
-  rgb_color.values[1] = (g + m) * 255.f;
-  rgb_color.values[2] = (b + m) * 255.f;
+  color_t rgb_color = createcolor(RGB, (r + m) * 255.f, (g + m) * 255.f, (b + m) * 255.f, 255);
   return rgb_color;
 }
 
@@ -673,11 +640,7 @@ static color_t hsl2hsv(color_t hsl)
   float l = hsl.values[2] / 100.f;
   float v = l + s * MIN2(l, 1 - l);
   s = v == 0.f ? 0.f : (2.f - 2.f * l / v);
-  color_t hsv_color;
-  hsv_color.model = HSV;
-  hsv_color.values[0] = h;
-  hsv_color.values[1] = s * 100.f;
-  hsv_color.values[2] = v * 100.f;
+  color_t hsv_color = createcolor(HSV, h, s * 100.f, v * 100.f, 255);
   return hsv_color;
 }
 
