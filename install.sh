@@ -1,5 +1,6 @@
 #!/bin/env bash
 
+
 default_install_path="$HOME/.local/bin/"
 
 if [ -n "$1" ]; then
@@ -11,7 +12,7 @@ fi
 gcc -o ./color ./color.c -lm
 
 if [ $? -eq 0 ]; then
-  cp color "$install_path"
+  mv color "$install_path"
   if [ $? -eq 0 ]; then
     echo "color-cli has been successfully installed."
   else
