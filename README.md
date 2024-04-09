@@ -25,10 +25,8 @@ clang -O2 -o color main.c color.c -lm
 You can also use `make` for simpler workflow. `make build` produces an executable file `color` in `target/bin/` directory(unless you have compiled it using one of the commands above) that you can include in your `$PATH`. To build, or clean, try:
 
 ```sh
-# makes build/ dir and then builds the program
-make prebuild
+# compiles the program
 make build
-
 # cleans build/
 make clean
 ```
@@ -56,6 +54,12 @@ To uninstall `color`, simply run:
 ```
 make uninstall
 ```
+
+## Library
+
+`color` can be used as a static library as well. For that, you can use `make install-lib` that produces
+`libcolr.a` and copies it to `/usr/local/lib`, other than that `color.h` is placed in `/usr/local/include`.
+See [Makefile][makefile] for better understanding of the workflow.
 
 ## Usage/Examples
 
@@ -114,3 +118,4 @@ improvements, please, do not hesitate to open an issue or send a pull request.
 Color-cli is licensed under the MIT License - see [LICENSE][license] for details.
 
 [license]: https://github.com/nebulaw/color-cli/blob/main/LICENSE
+[makefile]: https://github.com/nebulaw/color-cli/blob/main/Makefile

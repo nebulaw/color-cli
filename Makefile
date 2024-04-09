@@ -1,15 +1,16 @@
-# include directory
-IDIR=/usr/include
+# include and lib directories
+IDIR=/usr/local/include
+LDIR=/usr/local/lib
 # compiler
 CC=gcc
 # clags
-CFLAGS=-Wall -Wextra -O2 -I$(IDIR)
+CFLAGS=-Wall -Wextra -O2
 
-LDIR=/usr/lib
 # build and object directories
 TDIR=target
 ODIR=$(TDIR)/obj
 BDIR=$(TDIR)/bin
+SLIB=libcolr.a
 
 # libraries
 LIBS=-lm
@@ -26,8 +27,8 @@ all: prebuild build install
 prebuild:
 	mkdir -p $(ODIR); mkdir -p $(BDIR)
 
-build: $(OBJ)
-	$(CC) -o $(TARGET) $^ $(CFLAGS) $(LIBS)
+build: prebuild $(OBJ)
+	$(CC) -o $(TARGET) $(OBJ) $(CFLAGS) $(LIBS)
 
 $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -37,6 +38,12 @@ install: build
 
 uninstall: $(TARGET)
 	rm -f /usr/local/bin/$(notdir $(TARGET))
+
+build-lib: prebuild $(ODIR)/color.o
+	ar rcs $(TDIR)/$(SLIB) $(ODIR)/color.o
+
+install-lib: build-lib
+	cp $(TDIR)/$(SLIB) /usr/local/lib/ ; cp $(DEPS) $(IDIR)/
 
 .PHONY: clean
 
