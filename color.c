@@ -417,7 +417,9 @@ color_t brighten(color_t color, float value)
 
 void displaycolor(color_t color)
 {
-  printf("%s\n", getcolorstr(color));
+  char *colorstr = getcolorstr(color);
+  printf("%s\n", colorstr);
+  free(colorstr);
 }
 
 char *getcolorstr(color_t color)
@@ -450,8 +452,12 @@ char *getcolorstr(color_t color)
 
 void displaycomplementarycolor(color_t color)
 {
-  printf("%s\n", getcolorstr(color));
-  printf("%s\n", getcolorstr(negate(color)));
+  char *colorstr = getcolorstr(color);
+  char *complementary_colorstr = getcolorstr(negate(color));
+  printf("%s\n", colorstr);
+  printf("%s\n", complementary_colorstr);
+  free(colorstr);
+  free(complementary_colorstr);
 }
 
 void usage(void)

@@ -3,6 +3,7 @@ TODO.md
 
 # Dev
 build/
+target/
 bin/
 .idea/
 cmake-build-debug/
