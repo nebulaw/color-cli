@@ -22,7 +22,7 @@ gcc -O2 -o color main.c color.c -lm
 clang -O2 -o color main.c color.c -lm
 ```
 
-You can also use `make` for simpler workflow. `make build` produces an executable file `color` in `target/bin/` directory(unless you have compiled it using one of the commands above) that you can include in your `$PATH`. To build, or clean, try:
+You can also use `make` for simpler workflow. To build, or clean, try:
 
 ```sh
 # compiles the program
@@ -57,9 +57,13 @@ make uninstall
 
 ## Library
 
-`color` can be used as a static library as well. For that, you can use `make install-lib` that produces
-`libcolr.a` and copies it to `/usr/local/lib`, other than that `color.h` is placed in `/usr/local/include`.
-See [Makefile][makefile] for better understanding of the workflow.
+`color` can be used as a static library as well. For that, you can try:
+
+```sh
+make install-lib  
+```
+
+This puts header file in `/usr/local/include` and `libcolr.a` in `/usr/local/lib`.
 
 ## Usage/Examples
 
